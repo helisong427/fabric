@@ -43,47 +43,62 @@
 #   - unit-test-clean - cleans unit test state (particularly from docker)
 #   - unit-test - runs the go-test based unit tests
 #   - verify - runs unit tests for only the changed package tree
-
+# alpine linux基础镜像版本
 ALPINE_VER ?= 3.12
+# fabric版本
 BASE_VERSION = 2.2.1
 
 # 3rd party image version
 # These versions are also set in the runners in ./integration/runners/
+# 第三方依赖镜像版本
 COUCHDB_VER ?= 3.1
 KAFKA_VER ?= 5.3.1
 ZOOKEEPER_VER ?= 5.3.1
 
 # Disable implicit rules
+# 使用.SUFFIXES来表示两个文件的依赖关系，必须两个文件的文件名一致，只是文件类型不同才可以适应.SUFFIXES，.SUFFIXES无法与模式匹配（%.o:%.c）进行混用。
 .SUFFIXES:
+# MAKEFLAGS为make系统变量，默认使用，给它增加--no-builtin-rules参数表示禁用隐式规则（还可以使用make -r进行禁用）。
 MAKEFLAGS += --no-builtin-rules
 
 BUILD_DIR ?= build
 
+# 获取git仓库版本short ID
 EXTRA_VERSION ?= $(shell git rev-parse --short HEAD)
+# PROJECT_VERSION项目版本：2.2.1-snapshot-344fda602
 PROJECT_VERSION=$(BASE_VERSION)-snapshot-$(EXTRA_VERSION)
 
 # TWO_DIGIT_VERSION is derived, e.g. "2.0", especially useful as a local tag
 # for two digit references to most recent baseos and ccenv patch releases
+# TWO_DIGIT_VERSION为版本的前两个数字，如："2.0"，用于指定到最新的baseos和ccenv程序的发布版本
 TWO_DIGIT_VERSION = $(shell echo $(BASE_VERSION) | cut -d '.' -f 1,2)
 
+# PKGNAME为fabric的目录
 PKGNAME = github.com/hyperledger/fabric
+# ARCH为平台架构：amd64 arm64
 ARCH=$(shell go env GOARCH)
+# MARCH为系统加架构：windows-amd64  linux-amd64
 MARCH=$(shell go env GOOS)-$(shell go env GOARCH)
 
 # defined in common/metadata/metadata.go
+# 定义common/metadata/metadata.go文件中的变量，用于替换它们
 METADATA_VAR = Version=$(BASE_VERSION)
 METADATA_VAR += CommitSHA=$(EXTRA_VERSION)
 METADATA_VAR += BaseDockerLabel=$(BASE_DOCKER_LABEL)
 METADATA_VAR += DockerNamespace=$(DOCKER_NS)
-
+# go版本
 GO_VER = 1.14.4
 GO_TAGS ?=
-
+# RELEASE_EXES为发布的可执行程序列表
 RELEASE_EXES = orderer $(TOOLS_EXES)
+# RELEASE_IMAGES为发布的镜像列表
 RELEASE_IMAGES = baseos ccenv orderer peer tools
+# RELEASE_PLATFORMS为发布平台系统和架构列表
 RELEASE_PLATFORMS = darwin-amd64 linux-amd64 windows-amd64
+# TOOLS_EXES为除orderer外的其他可执行程序
 TOOLS_EXES = configtxgen configtxlator cryptogen discover idemixgen peer
 
+# 指定各个发布程序的编译目录
 pkgmap.configtxgen    := $(PKGNAME)/cmd/configtxgen
 pkgmap.configtxlator  := $(PKGNAME)/cmd/configtxlator
 pkgmap.cryptogen      := $(PKGNAME)/cmd/cryptogen
@@ -92,6 +107,8 @@ pkgmap.idemixgen      := $(PKGNAME)/cmd/idemixgen
 pkgmap.orderer        := $(PKGNAME)/cmd/orderer
 pkgmap.peer           := $(PKGNAME)/cmd/peer
 
+
+# Makefile 中的第一个目标为默认目标，这里通过.DEFAULT_GOAL来指定一个伪目标为默认目标
 .DEFAULT_GOAL := all
 
 include docker-env.mk
@@ -109,6 +126,7 @@ basic-checks: check-go-version license spelling references trailing-spaces linte
 .PHONY: desk-checks
 desk-check: checks verify
 
+# help-docs生成帮助文件
 .PHONY: help-docs
 help-docs: native
 	@scripts/generateHelpDocs.sh
@@ -132,6 +150,7 @@ trailing-spaces:
 .PHONY: gotools
 gotools: gotools-install
 
+# check-go-version只是用于检查go的版本是否大于等于1.14.4
 .PHONY: check-go-version
 check-go-version:
 	@scripts/check_go_version.sh $(GO_VER)
@@ -196,12 +215,19 @@ protos: gotool.protoc-gen-go
 	@echo "Compiling non-API protos..."
 	./scripts/compile_protos.sh
 
+# native本地编译
 .PHONY: native
 native: $(RELEASE_EXES)
 
+
+# $(RELEASE_EXES): %: $(BUILD_DIR)/bin/%  这个中间的%是为了让前置条件也进行展开，
+# 相当于 $(RELEASE_EXES): $(BUILD_DIR)/bin/orderer $(BUILD_DIR)/bin/peer $(BUILD_DIR)/bin/configtxgen
+# $(BUILD_DIR)/bin/configtxlator $(BUILD_DIR)/bin/cryptogen $(BUILD_DIR)/bin/discover $(BUILD_DIR)/bin/idemixgen
 .PHONY: $(RELEASE_EXES)
 $(RELEASE_EXES): %: $(BUILD_DIR)/bin/%
 
+
+# $@表示规则中的目标文件集; $(@D)表示"$@"的目录部分（不以斜杠作为结尾）;$(@F)表示"$@"的文件部分
 $(BUILD_DIR)/bin/%: GO_LDFLAGS = $(METADATA_VAR:%=-X $(PKGNAME)/common/metadata.%)
 $(BUILD_DIR)/bin/%:
 	@echo "Building $@"
