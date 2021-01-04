@@ -93,6 +93,8 @@ GO_TAGS ?=
 RELEASE_EXES = orderer $(TOOLS_EXES)
 # RELEASE_IMAGES为发布的镜像列表
 RELEASE_IMAGES = baseos ccenv orderer peer tools
+# UPDATE_IMAGES为更新的镜像列表
+UPDATE_IMAGES = orderer peer tools
 # RELEASE_PLATFORMS为发布平台系统和架构列表
 RELEASE_PLATFORMS = darwin-amd64 linux-amd64 windows-amd64
 # TOOLS_EXES为除orderer外的其他可执行程序
@@ -115,13 +117,19 @@ include docker-env.mk
 include gotools.mk
 
 .PHONY: all
-all: check-go-version native docker checks
+all: check-go-version native docker
+#all: check-go-version native docker checks
+	@echo "======================================================"
+	@echo "=============         all done.     =================="
+	@echo "======================================================"
+
 
 .PHONY: checks
 checks: basic-checks unit-test integration-test
 
 .PHONY: basic-checks
 basic-checks: check-go-version license spelling references trailing-spaces linter check-metrics-doc filename-spaces
+
 
 .PHONY: desk-checks
 desk-check: checks verify
@@ -154,6 +162,9 @@ gotools: gotools-install
 .PHONY: check-go-version
 check-go-version:
 	@scripts/check_go_version.sh $(GO_VER)
+	@echo "======================================================"
+	@echo "=============== check-go-version done. ==============="
+	@echo "======================================================"
 
 .PHONY: integration-test
 integration-test: integration-test-prereqs
@@ -218,7 +229,9 @@ protos: gotool.protoc-gen-go
 # native本地编译
 .PHONY: native
 native: $(RELEASE_EXES)
-
+	@echo "======================================================"
+	@echo "===============     native done.       ==============="
+	@echo "======================================================"
 
 # $(RELEASE_EXES): %: $(BUILD_DIR)/bin/%  这个中间的%是为了让前置条件也进行展开，
 # 相当于 $(RELEASE_EXES): $(BUILD_DIR)/bin/orderer $(BUILD_DIR)/bin/peer $(BUILD_DIR)/bin/configtxgen
@@ -237,6 +250,9 @@ $(BUILD_DIR)/bin/%:
 
 .PHONY: docker
 docker: $(RELEASE_IMAGES:%=%-docker)
+	@echo "======================================================"
+	@echo "==========        docker done.        ================"
+	@echo "======================================================"
 
 .PHONY: $(RELEASE_IMAGES:%=%-docker)
 $(RELEASE_IMAGES:%=%-docker): %-docker: $(BUILD_DIR)/images/%/$(DUMMY)
@@ -258,6 +274,8 @@ $(BUILD_DIR)/images/%/$(DUMMY):
 	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(TWO_DIGIT_VERSION)
 	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(DOCKER_TAG)
 	@touch $@
+
+
 
 # builds release packages for the host platform
 .PHONY: release

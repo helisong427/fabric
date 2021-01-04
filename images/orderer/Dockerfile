@@ -134,32 +134,6 @@ RUN apk add --no-cache tzdata
 # 判断/etc/nsswitch.conf不存在则新建，执行此命令：echo 'hosts: files dns' > /etc/nsswitch.conf
 RUN [ ! -e /etc/nsswitch.conf ] && echo 'hosts: files dns' > /etc/nsswitch.conf
 
-# 使用golang:1.14.4-alpine3.12作为基础镜像
-FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
-
-# 使用apk包管理器安装gcc musl-dev git bash make
-RUN apk add --no-cache \
-	gcc \
-	musl-dev \
-	git \
-	bash \
-	make;
-
-# 把当前的目录内容拷贝到容器中的$GOPATH/src/github.com/hyperledger/fabric目录
-ADD . $GOPATH/src/github.com/hyperledger/fabric
-# 指定工作目录。用 WORKDIR 指定的工作目录，会在构建镜像的每一层中都存在。（WORKDIR 指定的工作目录，必须是提前创建好的）。
-# docker build 构建镜像过程中的，每一个 RUN 命令都是新建的一层。只有通过 WORKDIR 创建的目录才会一直存在。
-WORKDIR $GOPATH/src/github.com/hyperledger/fabric
-
-# 以上面的golang镜像作为基础镜像创建orderer镜像，在此orderer镜像中编译orderer
-FROM golang as orderer
-# 定义GO_TAGS变量
-ARG GO_TAGS
-# 在容器中编译orderer
-RUN make orderer GO_TAGS=${GO_TAGS}
-
-# 再次以base为基础镜像
-FROM base
 # 设置FABRIC_CFG_PATH环境
 ENV FABRIC_CFG_PATH /etc/hyperledger/fabric
 
@@ -169,9 +143,51 @@ VOLUME /etc/hyperledger/fabric
 VOLUME /var/hyperledger
 
 #  从orderer镜像中拷贝数据到当前镜像中
-COPY --from=orderer /go/src/github.com/hyperledger/fabric/build/bin /usr/local/bin
-COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/msp ${FABRIC_CFG_PATH}/msp
-COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/orderer.yaml ${FABRIC_CFG_PATH}
-COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/configtx.yaml ${FABRIC_CFG_PATH}
+COPY  build/bin/orderer /usr/local/bin/orderer
+COPY  sampleconfig/msp ${FABRIC_CFG_PATH}/msp
+COPY  sampleconfig/orderer.yaml ${FABRIC_CFG_PATH}
+COPY  sampleconfig/configtx.yaml ${FABRIC_CFG_PATH}
 EXPOSE 7050
 CMD ["orderer"]
+#
+## 使用golang:1.14.4-alpine3.12作为基础镜像
+#FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
+#
+## 使用apk包管理器安装gcc musl-dev git bash make
+#RUN apk add --no-cache \
+#	gcc \
+#	musl-dev \
+#	git \
+#	bash \
+#	make;
+#
+## 把当前的目录内容拷贝到容器中的$GOPATH/src/github.com/hyperledger/fabric目录
+#ADD . $GOPATH/src/github.com/hyperledger/fabric
+## 指定工作目录。用 WORKDIR 指定的工作目录，会在构建镜像的每一层中都存在。（WORKDIR 指定的工作目录，必须是提前创建好的）。
+## docker build 构建镜像过程中的，每一个 RUN 命令都是新建的一层。只有通过 WORKDIR 创建的目录才会一直存在。
+#WORKDIR $GOPATH/src/github.com/hyperledger/fabric
+#
+## 以上面的golang镜像作为基础镜像创建orderer镜像，在此orderer镜像中编译orderer
+#FROM golang as orderer
+## 定义GO_TAGS变量
+#ARG GO_TAGS
+## 在容器中编译orderer
+#RUN make orderer GO_TAGS=${GO_TAGS}
+#
+## 再次以base为基础镜像
+#FROM base
+## 设置FABRIC_CFG_PATH环境
+#ENV FABRIC_CFG_PATH /etc/hyperledger/fabric
+#
+## 定义匿名数据卷（避免重要的数据，因容器重启而丢失；避免容器不断变大）。在启动容器时忘记挂载数据卷，会自动挂载到匿名卷。
+## 只设置了容器的挂载点，并没有指定关联的主机目录。这时docker会自动绑定主机上的一个目录。通过docker inspect 命令可以查看到。
+#VOLUME /etc/hyperledger/fabric
+#VOLUME /var/hyperledger
+#
+##  从orderer镜像中拷贝数据到当前镜像中
+#COPY --from=orderer /go/src/github.com/hyperledger/fabric/build/bin /usr/local/bin
+#COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/msp ${FABRIC_CFG_PATH}/msp
+#COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/orderer.yaml ${FABRIC_CFG_PATH}
+#COPY --from=orderer /go/src/github.com/hyperledger/fabric/sampleconfig/configtx.yaml ${FABRIC_CFG_PATH}
+#EXPOSE 7050
+#CMD ["orderer"]
