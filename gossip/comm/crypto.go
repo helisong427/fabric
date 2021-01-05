@@ -10,7 +10,7 @@ import (
 	"context"
 
 	"github.com/hyperledger/fabric/common/util"
-	"google.golang.org/grpc/credentials"
+	credentials "github.com/tjfoc/gmtls/gmcredentials"
 	"google.golang.org/grpc/peer"
 )
 

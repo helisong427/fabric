@@ -3,8 +3,11 @@ module github.com/hyperledger/fabric
 go 1.14
 
 // https://github.com/golang/go/issues/34610
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20190920190810-ef0ce1748380
-
+replace (
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190920190810-ef0ce1748380
+	github.com/tjfoc/gmsm => ../tjfoc/gmsm
+	github.com/tjfoc/gmtls => ../tjfoc/gmtls
+)
 require (
 	code.cloudfoundry.org/clock v1.0.0
 	github.com/DataDog/zstd v1.4.0 // indirect
@@ -71,4 +74,6 @@ require (
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/cheggaaa/pb.v1 v1.0.28
 	gopkg.in/yaml.v2 v2.2.8
+	github.com/tjfoc/gmsm v1.1.1
+	github.com/tjfoc/gmtls v1.1.9
 )
