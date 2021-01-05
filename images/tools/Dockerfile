@@ -117,31 +117,29 @@
 
 ARG GO_VER
 ARG ALPINE_VER
-#FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
-#
-#RUN apk add --no-cache \
-#	bash \
-#	gcc \
-#	git \
-#	make \
-#	musl-dev;
-#
-#ADD . $GOPATH/src/github.com/hyperledger/fabric
-#WORKDIR $GOPATH/src/github.com/hyperledger/fabric
-#
-#FROM golang as tools
-#RUN make configtxgen configtxlator cryptogen peer discover idemixgen
+FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
 
-FROM alpine:${ALPINE_VER} as base
-# 使用apk包管理器安装tzdata（Time Zone Database，简称tz或tzinfo，是一组表示地球上各地的时间历史的代码和数据，目前由IANA维护。）
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache \
+	bash \
+	gcc \
+	git \
+	make \
+	musl-dev;
 
+ADD . $GOPATH/src/github.com/hyperledger/fabric
+WORKDIR $GOPATH/src/github.com/hyperledger/fabric
+
+FROM golang as tools
+RUN make configtxgen configtxlator cryptogen peer discover idemixgen
+
+FROM golang:${GO_VER}-alpine
+# git is required to support `go list -m`
+RUN apk add --no-cache \
+	bash \
+	git \
+	jq \
+	tzdata;
 ENV FABRIC_CFG_PATH /etc/hyperledger/fabric
 VOLUME /etc/hyperledger/fabric
-COPY build/bin/configtxgen /usr/local/bin/configtxgen
-COPY build/bin/configtxlator /usr/local/bin/configtxlator
-COPY build/bin/peer /usr/local/bin/peer
-COPY build/bin/cryptogen /usr/local/bin/cryptogen
-COPY build/bin/discover /usr/local/bin/discover
-COPY build/bin/idemixgen /usr/local/bin/idemixgen
-COPY sampleconfig ${FABRIC_CFG_PATH}
+COPY --from=tools /go/src/github.com/hyperledger/fabric/build/bin /usr/local/bin
+COPY --from=tools /go/src/github.com/hyperledger/fabric/sampleconfig ${FABRIC_CFG_PATH}
