@@ -54,3 +54,4 @@ BASE_DOCKER_LABEL=org.hyperledger.fabric
 # file to differentiate different tags to fix FAB-1145
 #
 DUMMY = .dummy-$(DOCKER_TAG)
+BASE_TAR = $(ARCH)-$(BASE_VERSION)-$(EXTRA_VERSION)

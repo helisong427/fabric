@@ -80,7 +80,8 @@ GO_VER = 1.14.4
 GO_TAGS ?=
 
 RELEASE_EXES = orderer $(TOOLS_EXES)
-RELEASE_IMAGES = baseos ccenv orderer peer tools
+RELEASE_IMAGES = orderer peer tools
+BASE_IMAGES = baseos ccenv compile_golang orderandpeer_base tools_base
 RELEASE_PLATFORMS = darwin-amd64 linux-amd64 windows-amd64
 TOOLS_EXES = configtxgen configtxlator cryptogen discover idemixgen peer
 
@@ -209,29 +210,75 @@ $(BUILD_DIR)/bin/%:
 	GOBIN=$(abspath $(@D)) CGO_ENABLED=0 go install -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" $(pkgmap.$(@F))
 	@touch $@
 
-.PHONY: docker
-docker: $(RELEASE_IMAGES:%=%-docker)
 
-.PHONY: $(RELEASE_IMAGES:%=%-docker)
-$(RELEASE_IMAGES:%=%-docker): %-docker: $(BUILD_DIR)/images/%/$(DUMMY)
 
-$(BUILD_DIR)/images/ccenv/$(DUMMY):   BUILD_CONTEXT=images/ccenv
-$(BUILD_DIR)/images/baseos/$(DUMMY):  BUILD_CONTEXT=images/baseos
-$(BUILD_DIR)/images/peer/$(DUMMY):    BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
-$(BUILD_DIR)/images/orderer/$(DUMMY): BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
 
-$(BUILD_DIR)/images/%/$(DUMMY):
-	@echo "Building Docker image $(DOCKER_NS)/fabric-$*"
+.PHONY: docker_base
+docker_base: $(BASE_IMAGES:%=%-docker_base)
+
+.PHONY: $(BASE_IMAGES:%=%-docker_base)
+$(BASE_IMAGES:%=%-docker_base): %-docker_base: images/files/%/$(BASE_TAR)
+
+images/files/ccenv/$(BASE_TAR):   BUILD_CONTEXT=images/ccenv
+images/files/baseos/$(BASE_TAR):  BUILD_CONTEXT=images/baseos
+images/files/compile_golang/$(BASE_TAR):    BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
+images/files/orderandpeer_base/$(BASE_TAR): BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
+
+
+#baseos ccenv compile_golang orderandpeer_base tools_base
+images/files/%/$(BASE_TAR):
+	@echo "Building Docker base image $(DOCKER_NS)/fabric-$*"
 	@mkdir -p $(@D)
 	$(DBUILD) -f images/$*/Dockerfile \
 		--build-arg GO_VER=$(GO_VER) \
 		--build-arg ALPINE_VER=$(ALPINE_VER) \
 		$(BUILD_ARGS) \
 		-t $(DOCKER_NS)/fabric-$* ./$(BUILD_CONTEXT)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_VERSION)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(TWO_DIGIT_VERSION)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(DOCKER_TAG)
-	@touch $@
+	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+	docker save $(DOCKER_NS)/fabric-$*:$(BASE_TAR) > $@.tar.gz $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+
+
+.PHONY: docker
+docker: docker_init $(RELEASE_IMAGES:%=%-docker)
+
+.PHONY: docker_init
+docker_init:
+	docker load < images/files/compile_golang/$(BASE_TAR).tar.gz
+	docker load < images/files/orderandpeer_base/$(BASE_TAR).tar.gz
+	docker load < images/files/tools_base/$(BASE_TAR).tar.gz
+
+.PHONY: $(RELEASE_IMAGES:%=%-docker)
+$(RELEASE_IMAGES:%=%-docker): %-docker: images/files/%/$(BASE_TAR).tar.gz
+
+images/files/peer/$(BASE_TAR).tar.gz:    BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
+images/files/orderer/$(BASE_TAR).tar.gz: BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
+
+images/files/%/$(BASE_TAR).tar.gz:
+	@echo "Building Docker image $(DOCKER_NS)/fabric-$*"
+	@mkdir -p $(@D)
+	$(DBUILD) -f images/$*/Dockerfile \
+		--build-arg BASE_TAR=$(BASE_TAR) \
+		$(BUILD_ARGS) \
+		-t $(DOCKER_NS)/fabric-$* ./$(BUILD_CONTEXT)
+	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+	docker save $(DOCKER_NS)/fabric-$*:$(BASE_TAR) > $@ $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+
+.PHONY: docker_load
+docker_load:
+	docker load < images/files/baseos/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-baseos:$(BASE_TAR) $(DOCKER_NS)/fabric-baseos:latest
+
+	docker load < images/files/ccenv/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-ccenv:$(BASE_TAR) $(DOCKER_NS)/fabric-ccenv:latest
+
+	docker load < images/files/peer/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-peer:$(BASE_TAR) $(DOCKER_NS)/fabric-peer:latest
+
+	docker load < images/files/orderer/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-orderer:$(BASE_TAR) $(DOCKER_NS)/fabric-orderer:latest
+
+	docker load < images/files/tools/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-tools:$(BASE_TAR) $(DOCKER_NS)/fabric-tools:latest
 
 # builds release packages for the host platform
 .PHONY: release
