@@ -210,42 +210,44 @@ $(BUILD_DIR)/bin/%:
 	GOBIN=$(abspath $(@D)) CGO_ENABLED=0 go install -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" $(pkgmap.$(@F))
 	@touch $@
 
+.PHONY: docker_clean
+docker_clean: clean-all
+	@rm -rf images/files/order/$(BASE_TAR).tar.gz
+	@rm -rf images/files/peer/$(BASE_TAR).tar.gz
+	@rm -rf images/files/tools/$(BASE_TAR).tar.gz
 
 
+.PHONY: docker_load
+docker_load:
+	docker load < images/files/baseos/$(BASE_TAR).tar
+	docker tag $(DOCKER_NS)/fabric-baseos:$(BASE_TAR) $(DOCKER_NS)/fabric-baseos:latest
+	docker tag $(DOCKER_NS)/fabric-baseos:$(BASE_TAR) $(DOCKER_NS)/fabric-baseos:$(TWO_DIGIT_VERSION)
+	docker tag $(DOCKER_NS)/fabric-baseos:$(BASE_TAR) $(DOCKER_NS)/fabric-baseos:$(BASE_VERSION)
 
-.PHONY: docker_base
-docker_base: $(BASE_IMAGES:%=%-docker_base)
+	docker load < images/files/ccenv/$(BASE_TAR).tar
+	docker tag $(DOCKER_NS)/fabric-ccenv:$(BASE_TAR) $(DOCKER_NS)/fabric-ccenv:latest
+	docker tag $(DOCKER_NS)/fabric-ccenv:$(BASE_TAR) $(DOCKER_NS)/fabric-ccenv:$(TWO_DIGIT_VERSION)
+	docker tag $(DOCKER_NS)/fabric-ccenv:$(BASE_TAR) $(DOCKER_NS)/fabric-ccenv:$(BASE_VERSION)
 
-.PHONY: $(BASE_IMAGES:%=%-docker_base)
-$(BASE_IMAGES:%=%-docker_base): %-docker_base: images/files/%/$(BASE_TAR)
+	docker load < images/files/peer/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-peer:$(BASE_TAR) $(DOCKER_NS)/fabric-peer:latest
+	docker tag $(DOCKER_NS)/fabric-peer:$(BASE_TAR) $(DOCKER_NS)/fabric-peer:$(TWO_DIGIT_VERSION)
+	docker tag $(DOCKER_NS)/fabric-peer:$(BASE_TAR) $(DOCKER_NS)/fabric-peer:$(BASE_VERSION)
 
-images/files/ccenv/$(BASE_TAR):   BUILD_CONTEXT=images/ccenv
-images/files/baseos/$(BASE_TAR):  BUILD_CONTEXT=images/baseos
-images/files/compile_golang/$(BASE_TAR):    BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
-images/files/orderandpeer_base/$(BASE_TAR): BUILD_ARGS=--build-arg GO_TAGS=${GO_TAGS}
+	docker load < images/files/orderer/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-orderer:$(BASE_TAR) $(DOCKER_NS)/fabric-orderer:latest
+	docker tag $(DOCKER_NS)/fabric-orderer:$(BASE_TAR) $(DOCKER_NS)/fabric-orderer:$(TWO_DIGIT_VERSION)
+	docker tag $(DOCKER_NS)/fabric-orderer:$(BASE_TAR) $(DOCKER_NS)/fabric-orderer:$(BASE_VERSION)
 
-
-#baseos ccenv compile_golang orderandpeer_base tools_base
-images/files/%/$(BASE_TAR):
-	@echo "Building Docker base image $(DOCKER_NS)/fabric-$*"
-	@mkdir -p $(@D)
-	$(DBUILD) -f images/$*/Dockerfile \
-		--build-arg GO_VER=$(GO_VER) \
-		--build-arg ALPINE_VER=$(ALPINE_VER) \
-		$(BUILD_ARGS) \
-		-t $(DOCKER_NS)/fabric-$* ./$(BUILD_CONTEXT)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
-	docker save $(DOCKER_NS)/fabric-$*:$(BASE_TAR) > $@.tar.gz $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+	docker load < images/files/tools/$(BASE_TAR).tar.gz
+	docker tag $(DOCKER_NS)/fabric-tools:$(BASE_TAR) $(DOCKER_NS)/fabric-tools:latest
+	docker tag $(DOCKER_NS)/fabric-tools:$(BASE_TAR) $(DOCKER_NS)/fabric-tools:$(TWO_DIGIT_VERSION)
+	docker tag $(DOCKER_NS)/fabric-tools:$(BASE_TAR) $(DOCKER_NS)/fabric-tools:$(BASE_VERSION)
 
 
 .PHONY: docker
-docker: docker_init $(RELEASE_IMAGES:%=%-docker)
+docker: docker_base $(RELEASE_IMAGES:%=%-docker)
 
-.PHONY: docker_init
-docker_init:
-	docker load < images/files/compile_golang/$(BASE_TAR).tar.gz
-	docker load < images/files/orderandpeer_base/$(BASE_TAR).tar.gz
-	docker load < images/files/tools_base/$(BASE_TAR).tar.gz
 
 .PHONY: $(RELEASE_IMAGES:%=%-docker)
 $(RELEASE_IMAGES:%=%-docker): %-docker: images/files/%/$(BASE_TAR).tar.gz
@@ -263,22 +265,34 @@ images/files/%/$(BASE_TAR).tar.gz:
 	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
 	docker save $(DOCKER_NS)/fabric-$*:$(BASE_TAR) > $@ $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
 
-.PHONY: docker_load
-docker_load:
-	docker load < images/files/baseos/$(BASE_TAR).tar.gz
-	docker tag $(DOCKER_NS)/fabric-baseos:$(BASE_TAR) $(DOCKER_NS)/fabric-baseos:latest
+#.PHONY: docker_init
+#docker_init:
+#	docker load < images/files/compile_golang/$(BASE_TAR).tar
+#	docker load < images/files/orderandpeer_base/$(BASE_TAR).tar
+#	docker load < images/files/tools_base/$(BASE_TAR).tar
 
-	docker load < images/files/ccenv/$(BASE_TAR).tar.gz
-	docker tag $(DOCKER_NS)/fabric-ccenv:$(BASE_TAR) $(DOCKER_NS)/fabric-ccenv:latest
 
-	docker load < images/files/peer/$(BASE_TAR).tar.gz
-	docker tag $(DOCKER_NS)/fabric-peer:$(BASE_TAR) $(DOCKER_NS)/fabric-peer:latest
+.PHONY: docker_base
+docker_base: $(BASE_IMAGES:%=%-docker_base)
 
-	docker load < images/files/orderer/$(BASE_TAR).tar.gz
-	docker tag $(DOCKER_NS)/fabric-orderer:$(BASE_TAR) $(DOCKER_NS)/fabric-orderer:latest
+.PHONY: $(BASE_IMAGES:%=%-docker_base)
+$(BASE_IMAGES:%=%-docker_base): %-docker_base: images/files/%/$(BASE_TAR).tar
 
-	docker load < images/files/tools/$(BASE_TAR).tar.gz
-	docker tag $(DOCKER_NS)/fabric-tools:$(BASE_TAR) $(DOCKER_NS)/fabric-tools:latest
+images/files/ccenv/$(BASE_TAR).tar:   BUILD_CONTEXT=images/ccenv
+images/files/baseos/$(BASE_TAR).tar:  BUILD_CONTEXT=images/baseos
+
+#baseos ccenv compile_golang orderandpeer_base tools_base
+images/files/%/$(BASE_TAR).tar:
+	@echo "Building Docker base image $(DOCKER_NS)/fabric-$*"
+	@mkdir -p $(@D)
+	$(DBUILD) -f images/$*/Dockerfile \
+		--build-arg GO_VER=$(GO_VER) \
+		--build-arg ALPINE_VER=$(ALPINE_VER) \
+		-t $(DOCKER_NS)/fabric-$* ./$(BUILD_CONTEXT)
+	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+	docker save $(DOCKER_NS)/fabric-$*:$(BASE_TAR) > $@ $(DOCKER_NS)/fabric-$*:$(BASE_TAR)
+
+
 
 # builds release packages for the host platform
 .PHONY: release
